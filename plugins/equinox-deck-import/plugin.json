@@ -1,28 +1,39 @@
 {
-    "$schema":      "../plugin.schema.json",
-    "id":           "equinox-deck-import",
-    "name":         "Equinox Deck Import",
-    "version":      "1.0.0",
-    "description":  "Import decks from an Equinox ZIP export to the Altered Deck API.",
-    "author":       "AlteredCore",
-    "icon":         "fa-solid fa-file-zipper",
-
-    "pages": [
-        {
-            "slug":     "equinox-deck-import",
-            "file":     "pages/import.php",
-            "title_en": "Import Decks from Equinox",
-            "title_fr": "Importer des decks depuis Equinox"
-        }
-    ],
-
-    "api": [
-        {"endpoint": "parse-zip",   "file": "papi/parse-zip.php"},
-        {"endpoint": "import-deck", "file": "papi/import-deck.php"}
-    ],
-
-    "assets": {
-        "css": ["assets/style.css"],
-        "js":  ["js/queue.js"]
+  "$schema": "../plugin.schema.json",
+  "id": "equinox-deck-import",
+  "name": "Equinox Deck Import",
+  "version": "1.1.0",
+  "description": "Import decks from an Equinox ZIP export to the Altered Deck Community API.",
+  "author": "Shnk - wavelet.alexandre@gmail.com",
+  "icon": "fa-solid fa-file-zipper",
+  "pages": [
+    {
+      "slug": "equinox-deck-import",
+      "file": "pages/import.php",
+      "title_en": "Import Decks from the Altered Site Export",
+      "title_fr": "Importer des decks depuis l'export du site Altered"
     }
+  ],
+  "api": [
+    {
+      "endpoint": "parse-zip",
+      "file": "papi/parse-zip.php"
+    },
+    {
+      "endpoint": "import-deck",
+      "file": "papi/import-deck.php"
+    }
+  ],
+  "assets": {
+    "css": [
+      "assets/style.css"
+    ],
+    "js": [
+      "js/edi-namespace.js",
+      "js/import-debug.js",
+      "js/import-queue.js",
+      "js/import-view.js",
+      "js/import-main.js"
+    ]
+  }
 }

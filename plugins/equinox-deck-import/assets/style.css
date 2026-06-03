@@ -14,3 +14,29 @@
     padding-top: .35rem;
     padding-bottom: .35rem;
 }
+
+/* Fixed-height scrollable list: the page no longer reflows as decks complete
+   (completed decks stay visible), and the header stays in view. */
+.edi-list-scroll {
+    max-height: 55vh;
+    overflow-y: auto;
+}
+.edi-queue-table {
+    table-layout: fixed;
+}
+.edi-queue-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+/* Stable status-column width so the row doesn't blink when the "current"
+   (spinner) badge appears or disappears; deck names wrap in the first column. */
+.edi-queue-table th.edi-status-col,
+#edi-deck-tbody td:last-child {
+    width: 11rem;
+    white-space: nowrap;
+}
+#edi-deck-tbody td:first-child {
+    word-break: break-word;
+}
