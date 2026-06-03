@@ -10,8 +10,8 @@
 ?>
 <script>
 var SITE_BASE = <?= json_encode($siteBase, JSON_UNESCAPED_SLASHES) ?>;
-var EDI_CSRF  = <?= json_encode($csrf) ?>;
-var EDI_TXT   = <?= json_encode($jsTxt, JSON_UNESCAPED_UNICODE) ?>;
+var EDI_CSRF = <?= json_encode($csrf) ?>;
+var EDI_TXT = <?= json_encode($jsTxt, JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <div class="container py-4" style="max-width:680px">
 

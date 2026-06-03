@@ -13,7 +13,7 @@ use AlteredCore\EquinoxDeckImport\Infrastructure\ZipDeckCsvReader;
 use AlteredCore\EquinoxDeckImport\Presentation\Translations;
 
 $lang = function_exists('getUiLang') ? getUiLang() : 'en';
-$msg  = Translations::parse($lang);
+$msg = Translations::parse($lang);
 
 if (!Guards::isLoggedIn()) {
     Json::send(['ok' => false, 'error' => $msg['unauthorized']], 401);
@@ -24,7 +24,7 @@ if (!Guards::csrfValid($_POST['csrf_token'] ?? null)) {
     return;
 }
 
-$tokens  = new KeycloakTokenProvider();
+$tokens = new KeycloakTokenProvider();
 $useCase = new ParseUpload(new ZipDeckCsvReader(), new DeckParser(), new CurlDeckApiClient($tokens), $tokens);
 
 $result = $useCase->execute($_FILES['equinox_zip'] ?? null, $msg, !empty($_POST['debug']));

@@ -28,140 +28,202 @@ final class ParseUpload
         DeckApiClientInterface $api,
         TokenProviderInterface $tokens
     ) {
-        $this->csv    = $csv;
+        $this->csv = $csv;
         $this->parser = $parser;
-        $this->api    = $api;
+        $this->api = $api;
         $this->tokens = $tokens;
     }
 
     /**
-     * @param array|null          $file  the $_FILES['equinox_zip'] entry
-     * @param array<string,string> $msg  localized parse messages
+     * @param array|null           $file     the $_FILES['equinox_zip'] entry
+     * @param array<string,string> $messages localized parse messages
      */
-    public function execute(?array $file, array $msg, bool $debugRequested): ParseResult
+    public function execute(?array $file, array $messages, bool $withDebug): ParseResult
+    {
+        $rejection = $this->rejectInvalidUpload($file, $messages);
+        if ($rejection !== null) {
+            return $rejection;
+        }
+
+        $csv = $this->csv->read((string) $file['tmp_name']);
+        $rejection = $this->rejectUnreadableCsv($csv, $messages);
+        if ($rejection !== null) {
+            return $rejection;
+        }
+
+        $decks = $this->parser->parse((string) $csv);
+        if ($decks === []) {
+            return ParseResult::failure(400, $messages['no_decks']);
+        }
+
+        $tokenPresent = $this->tokens->accessToken() !== '';
+        $dedup = $this->resolveDuplicateIndex($tokenPresent);
+
+        return ParseResult::success(
+            $this->withMatchingIds($decks, $dedup),
+            $dedup['warn'],
+            $tokenPresent,
+            $withDebug ? $this->buildDebug($decks, $tokenPresent, $dedup) : []
+        );
+    }
+
+    /**
+     * @param array<string,string> $messages
+     */
+    private function rejectInvalidUpload(?array $file, array $messages): ?ParseResult
     {
         if (!$this->csv->isSupported()) {
-            return ParseResult::failure(500, $msg['no_zipext']);
+            return ParseResult::failure(500, $messages['no_zipext']);
         }
-        if ($file === null || !is_array($file)
+        if ($file === null
             || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
             || (int) ($file['size'] ?? 0) === 0) {
-            return ParseResult::failure(400, $msg['no_file']);
+            return ParseResult::failure(400, $messages['no_file']);
         }
         if (strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION)) !== 'zip') {
-            return ParseResult::failure(400, $msg['not_zip']);
+            return ParseResult::failure(400, $messages['not_zip']);
         }
 
-        $raw = $this->csv->read((string) $file['tmp_name']);
-        if ($raw === null) {
-            return ParseResult::failure(400, $msg['cant_read']);
+        return null;
+    }
+
+    /**
+     * @param array<string,string> $messages
+     */
+    private function rejectUnreadableCsv(?string $csv, array $messages): ?ParseResult
+    {
+        if ($csv === null) {
+            return ParseResult::failure(400, $messages['cant_read']);
         }
-        if ($raw === '') {
-            return ParseResult::failure(400, $msg['empty_csv']);
+        if ($csv === '') {
+            return ParseResult::failure(400, $messages['empty_csv']);
         }
 
-        $decks = $this->parser->parse($raw);
-        if (empty($decks)) {
-            return ParseResult::failure(400, $msg['no_decks']);
+        return null;
+    }
+
+    /**
+     * Fetch the user's existing decks and index their ids by lowercased name.
+     * On no token or a fetch failure, dedup is skipped (warn = true).
+     *
+     * @return array{warn: bool, reason: string, nameToIds: array, existing: array, fetch: ?array}
+     */
+    private function resolveDuplicateIndex(bool $tokenPresent): array
+    {
+        if (!$tokenPresent) {
+            return ['warn' => true, 'reason' => 'no_token', 'nameToIds' => [], 'existing' => [], 'fetch' => null];
+        }
+        try {
+            $existing = $this->api->fetchUserDecks();
+        } catch (DeckApiException $e) {
+            return ['warn' => true, 'reason' => 'fetch_failed', 'nameToIds' => [], 'existing' => [], 'fetch' => $e->debug()];
         }
 
-        $token        = $this->tokens->accessToken();
-        $tokenPresent = $token !== '';
+        return ['warn' => false, 'reason' => '', 'nameToIds' => $this->indexByName($existing), 'existing' => $existing, 'fetch' => null];
+    }
 
-        $incomingNames = array_map(function (Deck $d): string {
+    /**
+     * @param array<int,array> $existing
+     * @return array<string, string[]>
+     */
+    private function indexByName(array $existing): array
+    {
+        $index = [];
+        foreach ($existing as $deck) {
+            $name = mb_strtolower(trim((string) ($deck['name'] ?? '')));
+            $id = $deck['id'] ?? null;
+            if ($name !== '' && $id !== null) {
+                $index[$name][] = (string) $id;
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param Deck[] $decks
+     * @return array<int,array>
+     */
+    private function withMatchingIds(array $decks, array $dedup): array
+    {
+        return array_map(static function (Deck $deck) use ($dedup): array {
+            $row = $deck->toArray();
+            $key = mb_strtolower(trim($deck->name()));
+            $row['matching_ids'] = $dedup['warn'] ? [] : ($dedup['nameToIds'][$key] ?? []);
+
+            return $row;
+        }, $decks);
+    }
+
+    /**
+     * @param Deck[] $decks
+     * @return array<string,mixed>
+     */
+    private function buildDebug(array $decks, bool $tokenPresent, array $dedup): array
+    {
+        $incomingNames = array_map(static function (Deck $d): string {
             return $d->name();
         }, $decks);
 
-        $debug = $debugRequested ? [
-            'token_present'     => $tokenPresent,
-            'dedup_warn'        => false,
-            'dedup_warn_reason' => '',
-            'fetch'             => null,
+        $fetch = $dedup['fetch'];
+        if (is_array($fetch) && isset($fetch['response_preview'])) {
+            $fetch['response_preview'] = mb_substr((string) $fetch['response_preview'], 0, 1000);
+        }
+
+        return [
+            'token_present' => $tokenPresent,
+            'dedup_warn' => $dedup['warn'],
+            'dedup_warn_reason' => $dedup['reason'],
+            'fetch' => $fetch,
             'parsed_deck_count' => count($decks),
-            'api_deck_count'    => 0,
-            'incoming_names'    => array_map(function (string $n): array {
-                return ['value' => $n, 'hex' => bin2hex($n)];
-            }, $incomingNames),
-            'api_names'         => [],
-            'near_misses'       => [],
-        ] : [];
+            'api_deck_count' => count($dedup['existing']),
+            'incoming_names' => array_map([$this, 'withHex'], $incomingNames),
+            'api_names' => array_map([$this, 'apiNameWithHex'], $dedup['existing']),
+            'near_misses' => $this->nearMisses($incomingNames, $dedup['existing']),
+        ];
+    }
 
-        $dedupWarn = false;
-        $nameToIds = []; // lowercase name => [id, ...]
+    /**
+     * @return array{value: string, hex: string}
+     */
+    private function withHex(string $name): array
+    {
+        return ['value' => $name, 'hex' => bin2hex($name)];
+    }
 
-        if (!$tokenPresent) {
-            $dedupWarn = true;
-            if ($debugRequested) {
-                $debug['dedup_warn_reason'] = 'no_token';
-            }
-        } else {
-            try {
-                $existing = $this->api->fetchUserDecks();
-                if ($debugRequested) {
-                    $debug['api_deck_count'] = count($existing);
-                    $debug['api_names'] = array_map(function ($d): array {
-                        $nm = (string) ($d['name'] ?? '');
-                        return ['value' => $nm, 'hex' => bin2hex($nm)];
-                    }, $existing);
-                    $debug['near_misses'] = $this->nearMisses($incomingNames, $existing);
-                }
-                foreach ($existing as $d) {
-                    $name = mb_strtolower(trim((string) ($d['name'] ?? '')));
-                    $id   = $d['id'] ?? null;
-                    if ($name !== '' && $id !== null) {
-                        $nameToIds[$name][] = (string) $id;
-                    }
-                }
-            } catch (DeckApiException $e) {
-                $dedupWarn = true;
-                if ($debugRequested) {
-                    $debug['dedup_warn_reason'] = 'fetch_failed';
-                    $fd = $e->debug();
-                    if (isset($fd['response_preview'])) {
-                        $fd['response_preview'] = mb_substr((string) $fd['response_preview'], 0, 1000);
-                    }
-                    $debug['fetch'] = $fd;
-                }
-            }
-        }
-        if ($debugRequested) {
-            $debug['dedup_warn'] = $dedupWarn;
-        }
-
-        $out = [];
-        foreach ($decks as $deck) {
-            $row                 = $deck->toArray();
-            $nameLower           = mb_strtolower(trim($deck->name()));
-            $row['matching_ids'] = $dedupWarn ? [] : ($nameToIds[$nameLower] ?? []);
-            $out[]               = $row;
-        }
-
-        return ParseResult::success($out, $dedupWarn, $tokenPresent, $debug);
+    /**
+     * @param array<string,mixed> $deck
+     * @return array{value: string, hex: string}
+     */
+    private function apiNameWithHex(array $deck): array
+    {
+        return $this->withHex((string) ($deck['name'] ?? ''));
     }
 
     /**
      * Names that match case-insensitively but differ byte-for-byte (diagnostic).
      *
-     * @param string[]          $incomingNames
-     * @param array<int,array>  $existing
+     * @param string[]         $incomingNames
+     * @param array<int,array> $existing
      * @return array<int,array>
      */
     private function nearMisses(array $incomingNames, array $existing): array
     {
         $out = [];
-        foreach ($incomingNames as $iname) {
-            foreach ($existing as $d) {
-                $aname = (string) ($d['name'] ?? '');
-                if ($iname !== $aname && mb_strtolower(trim($iname)) === mb_strtolower(trim($aname))) {
+        foreach ($incomingNames as $incoming) {
+            foreach ($existing as $deck) {
+                $api = (string) ($deck['name'] ?? '');
+                if ($incoming !== $api && mb_strtolower(trim($incoming)) === mb_strtolower(trim($api))) {
                     $out[] = [
-                        'incoming'     => $iname,
-                        'api'          => $aname,
-                        'incoming_hex' => bin2hex($iname),
-                        'api_hex'      => bin2hex($aname),
+                        'incoming' => $incoming,
+                        'api' => $api,
+                        'incoming_hex' => bin2hex($incoming),
+                        'api_hex' => bin2hex($api),
                     ];
                 }
             }
         }
+
         return $out;
     }
 }

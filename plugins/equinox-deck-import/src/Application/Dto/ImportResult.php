@@ -22,10 +22,10 @@ final class ImportResult
 
     private function __construct()
     {
-        $this->id        = null;
+        $this->id = null;
         $this->errorCode = null;
-        $this->errorMsg  = null;
-        $this->debug     = [];
+        $this->errorMsg = null;
+        $this->debug = [];
     }
 
     /**
@@ -34,10 +34,10 @@ final class ImportResult
     public static function skipped(array $debug = []): self
     {
         $r = new self();
-        $r->ok           = true;
-        $r->status       = 200;
+        $r->ok = true;
+        $r->status = 200;
         $r->resultStatus = 'skip';
-        $r->debug        = $debug;
+        $r->debug = $debug;
         return $r;
     }
 
@@ -47,11 +47,11 @@ final class ImportResult
     public static function imported(?string $id, array $debug = []): self
     {
         $r = new self();
-        $r->ok           = true;
-        $r->status       = 200;
+        $r->ok = true;
+        $r->status = 200;
         $r->resultStatus = 'imported';
-        $r->id           = $id;
-        $r->debug        = $debug;
+        $r->id = $id;
+        $r->debug = $debug;
         return $r;
     }
 
@@ -63,12 +63,12 @@ final class ImportResult
     public static function apiError(string $errorCode, string $errorMsg, array $debug = []): self
     {
         $r = new self();
-        $r->ok           = false;
-        $r->status       = 200;
+        $r->ok = false;
+        $r->status = 200;
         $r->resultStatus = 'error';
-        $r->errorCode    = $errorCode;
-        $r->errorMsg     = $errorMsg;
-        $r->debug        = $debug;
+        $r->errorCode = $errorCode;
+        $r->errorMsg = $errorMsg;
+        $r->debug = $debug;
         return $r;
     }
 
@@ -78,11 +78,11 @@ final class ImportResult
     public static function rejected(int $status, string $errorCode, string $errorMsg): self
     {
         $r = new self();
-        $r->ok           = false;
-        $r->status       = $status;
+        $r->ok = false;
+        $r->status = $status;
         $r->resultStatus = 'error';
-        $r->errorCode    = $errorCode;
-        $r->errorMsg     = $errorMsg;
+        $r->errorCode = $errorCode;
+        $r->errorMsg = $errorMsg;
         return $r;
     }
 
@@ -97,7 +97,7 @@ final class ImportResult
         }
         if ($this->resultStatus === 'error') {
             $out['error_code'] = $this->errorCode;
-            $out['error_msg']  = $this->errorMsg;
+            $out['error_msg'] = $this->errorMsg;
         }
         if (!empty($this->debug)) {
             $out['debug'] = $this->debug;

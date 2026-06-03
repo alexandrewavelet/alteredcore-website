@@ -24,13 +24,13 @@ final class ParseResult
     public static function failure(int $status, string $error): self
     {
         $r = new self();
-        $r->ok           = false;
-        $r->status       = $status;
-        $r->error        = $error;
-        $r->decks        = [];
-        $r->dedupWarn    = false;
+        $r->ok = false;
+        $r->status = $status;
+        $r->error = $error;
+        $r->decks = [];
+        $r->dedupWarn = false;
         $r->tokenPresent = false;
-        $r->debug        = [];
+        $r->debug = [];
         return $r;
     }
 
@@ -41,13 +41,13 @@ final class ParseResult
     public static function success(array $decks, bool $dedupWarn, bool $tokenPresent, array $debug): self
     {
         $r = new self();
-        $r->ok           = true;
-        $r->status       = 200;
-        $r->error        = null;
-        $r->decks        = $decks;
-        $r->dedupWarn    = $dedupWarn;
+        $r->ok = true;
+        $r->status = 200;
+        $r->error = null;
+        $r->decks = $decks;
+        $r->dedupWarn = $dedupWarn;
         $r->tokenPresent = $tokenPresent;
-        $r->debug        = $debug;
+        $r->debug = $debug;
         return $r;
     }
 
@@ -60,11 +60,11 @@ final class ParseResult
             return ['ok' => false, 'error' => $this->error];
         }
         return [
-            'ok'            => true,
-            'decks'         => $this->decks,
-            'dedup_warn'    => $this->dedupWarn,
+            'ok' => true,
+            'decks' => $this->decks,
+            'dedup_warn' => $this->dedupWarn,
             'token_present' => $this->tokenPresent,
-            'debug'         => $this->debug,
+            'debug' => $this->debug,
         ];
     }
 }

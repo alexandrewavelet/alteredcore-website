@@ -27,6 +27,6 @@ $heroPresent = new Deck('Y', 'standard', 'ALT_HERO', [new Card('ALT_HERO', 1), n
 assertSame(2, count($heroPresent->normalizedCards()), 'normalize: hero not duplicated when already present');
 
 // --- hashFrom on raw API arrays matches the Card[] hash ----------------------
-$raw    = [['cardReference' => 'ALT_A', 'quantity' => 2], ['cardReference' => 'ALT_B', 'quantity' => 1]];
+$raw = [['cardReference' => 'ALT_A', 'quantity' => 2], ['cardReference' => 'ALT_B', 'quantity' => 1]];
 $noHero = new Deck('Aggro', 'standard', '', [new Card('ALT_A', 2), new Card('ALT_B', 1)]);
 assertSame($noHero->contentHash(), Deck::hashFrom('Aggro', $raw), 'hashFrom: raw API arrays hash like Card[]');

@@ -9,10 +9,6 @@ use DomainException;
  *
  * The CSV is semicolon-separated with a header row; per row the columns used are
  * [0] deck id, [1] name, [2] format, [3] hero, [5] card reference, [7] quantity.
- * Duplicate rows for the same card within a deck are summed. Rows with an
- * invalid reference or a non-positive quantity are skipped (matching the
- * original behaviour); a summed quantity that exceeds the Card invariant (>99)
- * drops that card rather than aborting the parse.
  */
 final class DeckParser
 {
@@ -21,21 +17,30 @@ final class DeckParser
      */
     public function parse(string $raw): array
     {
-        $raw   = ltrim($raw, "\xEF\xBB\xBF"); // strip UTF-8 BOM
-        $lines = explode("\n", str_replace("\r", '', $raw));
+        return array_map([$this, 'buildDeck'], $this->accumulateDecks($raw));
+    }
 
-        // did => ['name','format','hero','cards' => [ref => qty]]
+    /**
+     * Group CSV rows by deck id (first-seen order), summing duplicate cards.
+     *
+     * @return array<int, array{name: string, format: string, hero: string, cards: array<string, int>}>
+     */
+    private function accumulateDecks(string $raw): array
+    {
+        $lines = explode("\n", str_replace("\r", '', ltrim($raw, "\xEF\xBB\xBF")));
+
         $decks = [];
         $order = [];
-        $first = true;
+        $isHeader = true;
 
         foreach ($lines as $line) {
             $line = trim($line);
             if ($line === '') {
                 continue;
             }
-            if ($first) {
-                $first = false; // skip header
+            if ($isHeader) {
+                $isHeader = false;
+
                 continue;
             }
 
@@ -44,40 +49,57 @@ final class DeckParser
                 continue;
             }
 
-            $did = trim($cols[0]);
-            if ($did === '') {
+            $id = trim($cols[0]);
+            if ($id === '') {
                 continue;
             }
 
-            $dname = trim($cols[1]);
-            $dfmt  = strtolower(trim($cols[2]));
-            $hero  = strtoupper(trim($cols[3]));
-            $cref  = strtoupper(trim($cols[5]));
-            $cqty  = (int) trim($cols[7]);
-
-            if (!isset($decks[$did])) {
-                $decks[$did] = ['name' => $dname, 'format' => $dfmt, 'hero' => $hero, 'cards' => []];
-                $order[]     = $did;
+            if (!isset($decks[$id])) {
+                $decks[$id] = [
+                    'name' => trim($cols[1]),
+                    'format' => strtolower(trim($cols[2])),
+                    'hero' => strtoupper(trim($cols[3])),
+                    'cards' => [],
+                ];
+                $order[] = $id;
             }
 
-            if ($cref !== '' && $cqty > 0 && preg_match('/^ALT_[A-Z0-9_]+$/', $cref)) {
-                $decks[$did]['cards'][$cref] = ($decks[$did]['cards'][$cref] ?? 0) + $cqty;
+            $this->addCard($decks[$id]['cards'], strtoupper(trim($cols[5])), (int) trim($cols[7]));
+        }
+
+        return array_map(static function (string $id) use ($decks) {
+            return $decks[$id];
+        }, $order);
+    }
+
+    /**
+     * Add a card row to a deck's reference => quantity map, summing duplicates
+     * and skipping rows with an invalid reference or a non-positive quantity.
+     *
+     * @param array<string, int> $cards
+     */
+    private function addCard(array &$cards, string $reference, int $quantity): void
+    {
+        if ($reference === '' || $quantity <= 0 || !preg_match('/^ALT_[A-Z0-9_]+$/', $reference)) {
+            return;
+        }
+        $cards[$reference] = ($cards[$reference] ?? 0) + $quantity;
+    }
+
+    /**
+     * @param array{name: string, format: string, hero: string, cards: array<string, int>} $row
+     */
+    private function buildDeck(array $row): Deck
+    {
+        $cards = [];
+        foreach ($row['cards'] as $reference => $quantity) {
+            try {
+                $cards[] = new Card($reference, $quantity);
+            } catch (DomainException $e) {
+                // Skip a card whose summed quantity falls outside the 1..99 range.
             }
         }
 
-        $result = [];
-        foreach ($order as $id) {
-            $d     = $decks[$id];
-            $cards = [];
-            foreach ($d['cards'] as $ref => $qty) {
-                try {
-                    $cards[] = new Card($ref, $qty);
-                } catch (DomainException $e) {
-                    // Skip a card whose summed quantity falls outside 1..99.
-                }
-            }
-            $result[] = new Deck($d['name'], $d['format'], $d['hero'], $cards);
-        }
-        return $result;
+        return new Deck($row['name'], $row['format'], $row['hero'], $cards);
     }
 }

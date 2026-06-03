@@ -11,7 +11,7 @@ use AlteredCore\EquinoxDeckImport\Infrastructure\KeycloakTokenProvider;
 use AlteredCore\EquinoxDeckImport\Presentation\Translations;
 
 $lang = function_exists('getUiLang') ? getUiLang() : 'en';
-$msg  = Translations::import($lang);
+$msg = Translations::import($lang);
 
 if (!Guards::isLoggedIn()) {
     Json::send(['ok' => false, 'status' => 'error', 'error_code' => 'auth', 'error_msg' => $msg['unauthorized']], 401);
@@ -28,7 +28,7 @@ if (!Guards::csrfValid($body['csrf_token'] ?? null)) {
     return;
 }
 
-$tokens  = new KeycloakTokenProvider();
+$tokens = new KeycloakTokenProvider();
 $useCase = new ImportDeck(new CurlDeckApiClient($tokens), $tokens);
 
 $result = $useCase->execute($body, $msg, !empty($body['debug']));

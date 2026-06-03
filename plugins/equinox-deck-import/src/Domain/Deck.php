@@ -21,10 +21,10 @@ final class Deck
      */
     public function __construct(string $name, string $format, string $hero, array $cards)
     {
-        $this->name   = $name;
+        $this->name = $name;
         $this->format = $format !== '' ? $format : 'standard';
-        $this->hero   = strtoupper(trim($hero));
-        $this->cards  = array_values($cards);
+        $this->hero = strtoupper(trim($hero));
+        $this->cards = array_values($cards);
     }
 
     public function name(): string
@@ -122,10 +122,10 @@ final class Deck
             $cards[] = $c->toApiArray();
         }
         return [
-            'name'   => $this->name,
+            'name' => $this->name,
             'format' => $this->format,
-            'hero'   => $this->hero,
-            'cards'  => $cards,
+            'hero' => $this->hero,
+            'cards' => $cards,
         ];
     }
 }

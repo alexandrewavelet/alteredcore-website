@@ -27,7 +27,7 @@ final class Card
             throw new DomainException('Invalid card quantity: ' . $quantity);
         }
         $this->reference = $reference;
-        $this->quantity  = $quantity;
+        $this->quantity = $quantity;
     }
 
     public function reference(): string
