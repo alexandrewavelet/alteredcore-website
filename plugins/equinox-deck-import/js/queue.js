@@ -61,6 +61,9 @@
     // ── Form submit intercept ─────────────────────────────────────────────────
     function onSubmit(e) {
         e.preventDefault();
+        // Ignore re-submits while a parse/import is already in progress (a second
+        // submit would capture FormData after the file input was disabled → empty upload).
+        if (state !== 'idle') return;
         // Capture FormData BEFORE disabling inputs — disabled controls are excluded from FormData
         var fd = new FormData($form);
         state = 'parsing';

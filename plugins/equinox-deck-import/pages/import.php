@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             // Only fetch full details for existing decks whose name
                             // matches an incoming deck — avoids N calls for all decks.
                             $incomingNames      = array_column($parsedDecks, 'name');
-                            $incomingNamesLower = array_map('mb_strtolower', $incomingNames);
+                            $incomingNamesLower = array_map(function ($n) { return mb_strtolower(trim($n)); }, $incomingNames);
 
                             // ── Name comparison debug ─────────────────────────
                             $dedupDebug['api_deck_count']  = count($existing);
@@ -192,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $toFetch = []; // id → summary deck object
                             foreach ($existing as $d) {
                                 $dname      = $d['name'] ?? '';
-                                $dnameLower = mb_strtolower($dname);
+                                $dnameLower = mb_strtolower(trim($dname));
                                 if (isset($d['id']) && in_array($dnameLower, $incomingNamesLower, true)) {
                                     $toFetch[(string)$d['id']] = $d;
                                 }
@@ -213,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $apiCards = $full['deckCards'] ?? $full['cards'] ?? [];
                                 $h        = ediDeckContentHash($dname, $apiCards);
                                 $existingHashes[]                       = $h;
-                                $existingByName[mb_strtolower($dname)]  = [
+                                $existingByName[mb_strtolower(trim($dname))]  = [
                                     'cards_count' => count($apiCards),
                                     'hash'        => $h,
                                     'keys'        => implode(', ', array_keys($d)),
@@ -227,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         foreach ($parsedDecks as $deck) {
                             $normalizedCards = ediNormalizeDeckCards($deck);
                             $incomingHash    = ediDeckContentHash($deck['name'], $normalizedCards);
-                            $existingEntry   = $existingByName[mb_strtolower($deck['name'])] ?? null;
+                            $existingEntry   = $existingByName[mb_strtolower(trim($deck['name']))] ?? null;
                             $matched         = !$dedupWarn && in_array($incomingHash, $existingHashes, true);
 
                             $dedupDetails[] = [

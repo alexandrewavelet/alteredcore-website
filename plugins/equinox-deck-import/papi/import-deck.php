@@ -44,8 +44,10 @@ if ($name === '' || !is_array($cards) || empty($cards)) {
 
 // Validate card shape before forwarding to external API
 foreach ($cards as $c) {
-    $ref = $c['cardReference'] ?? '';
-    $qty = (int)($c['quantity'] ?? 0);
+    // Index $c only once it is known to be an array (avoids PHP 7.4
+    // "Illegal string offset" warnings when a card element is a scalar).
+    $ref = is_array($c) ? ($c['cardReference'] ?? '') : '';
+    $qty = is_array($c) ? (int)($c['quantity'] ?? 0) : 0;
     if (!is_array($c) || !preg_match('/^ALT_[A-Z0-9_]+$/', (string)$ref) || $qty < 1 || $qty > 99) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'status' => 'error',

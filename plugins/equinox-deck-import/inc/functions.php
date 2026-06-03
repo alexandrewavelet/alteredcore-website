@@ -64,13 +64,26 @@ function ediParseDecks(string $raw): array
         }
 
         if ($cref !== '' && $cqty > 0 && preg_match('/^ALT_[A-Z0-9_]+$/', $cref)) {
-            $decks[$did]['cards'][] = ['cardReference' => $cref, 'quantity' => $cqty];
+            // Accumulate by cardReference (keyed map) so duplicate rows for the
+            // same card sum their quantities instead of producing duplicate
+            // deckCards entries the Deck API may reject. Flattened to a list below.
+            if (isset($decks[$did]['cards'][$cref])) {
+                $decks[$did]['cards'][$cref] += $cqty;
+            } else {
+                $decks[$did]['cards'][$cref] = $cqty;
+            }
         }
     }
 
     $result = [];
     foreach ($order as $id) {
-        $result[] = $decks[$id];
+        $deck  = $decks[$id];
+        $cards = [];
+        foreach ($deck['cards'] as $ref => $qty) {
+            $cards[] = ['cardReference' => $ref, 'quantity' => $qty];
+        }
+        $deck['cards'] = $cards;
+        $result[]      = $deck;
     }
     return $result;
 }
@@ -166,8 +179,8 @@ function ediFetchUserDecks(string $token, array &$debug = [])
             'Authorization: Bearer ' . $token,
         ],
         CURLOPT_TIMEOUT        => 20,
-        CURLOPT_SSL_VERIFYPEER => !defined('DEV_MODE'),
-        CURLOPT_SSL_VERIFYHOST => defined('DEV_MODE') ? 0 : 2,
+        CURLOPT_SSL_VERIFYPEER => !(defined('DEV_MODE') && DEV_MODE),
+        CURLOPT_SSL_VERIFYHOST => (defined('DEV_MODE') && DEV_MODE) ? 0 : 2,
     ]);
 
     $resp     = curl_exec($ch);
@@ -221,8 +234,8 @@ function ediFetchDecksByIds(array $ids, string $token, array &$errors = []): arr
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_TIMEOUT        => 20,
-            CURLOPT_SSL_VERIFYPEER => !defined('DEV_MODE'),
-            CURLOPT_SSL_VERIFYHOST => defined('DEV_MODE') ? 0 : 2,
+            CURLOPT_SSL_VERIFYPEER => !(defined('DEV_MODE') && DEV_MODE),
+            CURLOPT_SSL_VERIFYHOST => (defined('DEV_MODE') && DEV_MODE) ? 0 : 2,
         ]);
         curl_multi_add_handle($mh, $ch);
         $handles[$id] = $ch;
@@ -231,7 +244,13 @@ function ediFetchDecksByIds(array $ids, string $token, array &$errors = []): arr
     $running = null;
     do {
         curl_multi_exec($mh, $running);
-        curl_multi_select($mh);
+        if ($running > 0) {
+            // Block until there is activity; usleep avoids a 100% CPU busy-spin
+            // when curl_multi_select returns -1 (no descriptors ready / select error).
+            if (curl_multi_select($mh) === -1) {
+                usleep(1000);
+            }
+        }
     } while ($running > 0);
 
     $results = [];
@@ -292,8 +311,8 @@ function ediImportDeck(array $deck, string $token): array
         ],
         CURLOPT_POSTFIELDS     => $payload,
         CURLOPT_TIMEOUT        => 20,
-        CURLOPT_SSL_VERIFYPEER => !defined('DEV_MODE'),
-        CURLOPT_SSL_VERIFYHOST => defined('DEV_MODE') ? 0 : 2,
+        CURLOPT_SSL_VERIFYPEER => !(defined('DEV_MODE') && DEV_MODE),
+        CURLOPT_SSL_VERIFYHOST => (defined('DEV_MODE') && DEV_MODE) ? 0 : 2,
     ]);
 
     $resp     = curl_exec($ch);
