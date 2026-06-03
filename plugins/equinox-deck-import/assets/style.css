@@ -1,0 +1,16 @@
+/* Progress bar — uses the site's primary gold colour */
+#edi-progress-header .progress-bar {
+    background-color: var(--primary-400, #C9A84C);
+}
+
+/* Pending badge — neutral colour matching the design system */
+#edi-deck-tbody .badge-pending {
+    background-color: var(--neutral-200, #D6CFC4);
+    color: var(--neutral-600, #534B40);
+}
+
+/* Queue table rows — tighter padding for long lists */
+#edi-deck-tbody td {
+    padding-top: .35rem;
+    padding-bottom: .35rem;
+}
